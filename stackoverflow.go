@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -9,12 +10,23 @@ import (
 	"strings"
 )
 
-type Quota struct {
+const (
+	API_BASE = "https://api.stackexchange.com/2.2"
+)
+
+type CommonResponse struct {
+	ErrorId      int    `json:"error_id"`
+	ErrorMessage string `json:"error_message"`
+	ErrorName    string `json:"error_name"`
+
 	QuotaMax       int `json:"quota_max"`
 	QuotaRemaining int `json:"quota_remaining"`
+
+	HasMore bool `json:"has_more"`
 }
 
-type SearchResult struct {
+type SearchResponse struct {
+	CommonResponse
 	Items []struct {
 		Tags  []string `json:"tags"`
 		Owner struct {
@@ -36,11 +48,10 @@ type SearchResult struct {
 		Link             string `json:"link"`
 		Title            string `json:"title"`
 	} `json:"items"`
-	HasMore bool `json:"has_more"`
-	Quota
 }
 
 type AnswerResponse struct {
+	CommonResponse
 	Items []struct {
 		Owner struct {
 			Reputation   int    `json:"reputation"`
@@ -59,8 +70,23 @@ type AnswerResponse struct {
 		QuestionId       int    `json:"question_id"`
 		Body             string `json:"body"`
 	} `json:"items"`
-	HasMore bool `json:"has_more"`
-	Quota
+}
+
+type Validator interface {
+	IsValid() bool
+	Error() error
+}
+
+func (res CommonResponse) IsValid() bool {
+	if res.ErrorId > 0 || res.QuotaRemaining == 0 {
+		return false
+	}
+
+	return true
+}
+
+func (err CommonResponse) Error() error {
+	return fmt.Errorf("Error Id: %v, %v: %v", err.ErrorId, err.ErrorName, err.ErrorMessage)
 }
 
 func makeSearchRequest(query string) string {
@@ -71,7 +97,7 @@ func makeSearchRequest(query string) string {
 	args.Set("accepted", "True")
 	args.Set("q", query)
 
-	return "https://api.stackexchange.com/2.2/search/advanced?" + args.Encode()
+	return API_BASE + "/search/advanced?" + args.Encode()
 }
 
 func makeAnswerRequest(answerIds ...int) string {
@@ -86,9 +112,10 @@ func makeAnswerRequest(answerIds ...int) string {
 	args := url.Values{}
 	args.Set("order", "desc")
 	args.Set("sort", "activity")
+	args.Set("site", "stackoverflow")
 	args.Set("filter", "withbody")
 
-	return "https://api.stackexchange.com/2.2/answers/" + escaped + "?" + args.Encode()
+	return API_BASE + "/answers/" + escaped + "?" + args.Encode()
 }
 
 func get(url string) (body []byte, err error) {
@@ -102,28 +129,35 @@ func get(url string) (body []byte, err error) {
 	return ioutil.ReadAll(res.Body)
 }
 
-func Search(query string) (result *SearchResult, err error) {
-	url := makeSearchRequest(query)
+func load(url string, result Validator) (err error) {
 	body, err := get(url)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	result = new(SearchResult)
-	err = json.Unmarshal(body, &result)
+	err = json.Unmarshal(body, result)
+
+	if !result.IsValid() {
+		err = result.Error()
+	}
+
+	//fmt.Println(result.ErrorId)
 	return
 }
 
-func GetAnswers(ids ...int) (result *AnswerResponse, err error) {
+func Search(query string) (*SearchResponse, error) {
+	url := makeSearchRequest(query)
+	result := new(SearchResponse)
+	err := load(url, result)
+
+	return result, err
+}
+
+func GetAnswers(ids ...int) (*AnswerResponse, error) {
 	url := makeAnswerRequest(ids...)
-	body, err := get(url)
+	result := new(AnswerResponse)
+	err := load(url, result)
 
-	if err != nil {
-		return nil, err
-	}
-
-	result = new(AnswerResponse)
-	err = json.Unmarshal(body, &result)
-	return
+	return result, err
 }
