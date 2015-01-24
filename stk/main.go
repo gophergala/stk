@@ -12,17 +12,6 @@ import (
 //Program receives a string of the command that is supposed to be run.
 //ie stk go run execTest.go
 
-//LaunchReq is a struct that represents everything that
-//os.StartProcess is being provided
-type LaunchReq struct {
-	//The name of the command which we will find the path of
-	//and eventually fill out the rest of the data
-	Base     string
-	Path     string
-	Argv     []string
-	ProcAttr os.ProcAttr
-}
-
 //If we end up needing something a bit closer to the metal,
 //look at os.StartProcess before getting hackish
 
@@ -41,7 +30,6 @@ func init() {
 //  the API call,
 // 4. Get results, prepend file name to whatever the output was from the api
 func main() {
-	//	cmd := cleanInput(os.Args[1:])
 	//This will choke if more than one cmd is passed
 	cmd, err := cleanInput(os.Args[1:]...)
 	if err != nil {
@@ -66,15 +54,6 @@ func cleanInput(arg ...string) (cmd *exec.Cmd, err error) {
 		cmd = exec.Command(os.Args[1], "")
 	}
 	log.Printf("cmd.Args: %#v", cmd.Args)
-	//	lr = &LaunchReq{Base: os.Args[1], ProcAttr: os.ProcAttr{}}
-	//	l, err = exec.LookPath(os.Args[1])
-	//	if err != nil {
-	//		return
-	//	}
-	//	lr.Args = os.Args[1:]
-	//	fmt.Printf("%T %#v", lr.Argv, lr.Argv)
-	//This is where we redirect the io.Writer
-	//	lr.ProcAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
 	return
 }
 
