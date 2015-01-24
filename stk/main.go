@@ -40,6 +40,7 @@ func main() {
 //This will need a lot of tuning as it will be fragile
 func cleanInput(arg ...string) exec.Cmd {
 	fmt.Printf("Args: %v\n", arg)
+	//might use os.StartProcess to avoid the
 	return exec.Cmd{}
 }
 
@@ -50,10 +51,21 @@ func cleanInput(arg ...string) exec.Cmd {
 //which the API is blocking on in order to launch a request.
 func execCmd(cmd *exec.Cmd) {
 	//Make sure the actual command exists, ie go
-	path, err := exec.LookPath(cmd.Path)
+	path, err := exec.LookPath(os.Args[1])
 	if err != nil {
 		log.Fatalf("Bloody hell, at least install the command: %s\n",
-			cmd.Path)
+			os.Args[1])
 	}
 	fmt.Printf("Yay?%s\n", path)
+	var procAttr os.ProcAttr
+	procAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
+	process, e := os.StartProcess(path, os.Args[1:], &procAttr)
+	if e != nil {
+		log.Fatal("Process Start Failed", e)
+	}
+	procState, errs := process.Wait()
+
+	if errs != nil {
+		log.Fatal("Err on Exit:", procState, errs)
+	}
 }
