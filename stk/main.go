@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -54,20 +55,26 @@ func main() {
 //CleanInput takes all the relevant arguments from os.Args
 //and tries to break it down into an exec.Cmd struct
 //This will need a lot of tuning as it will be fragile
-func cleanInput(arg ...string) (lr *LaunchReq, err error) {
+func cleanInput(arg ...string) (cmd *exec.Cmd, err error) {
 	if len(arg) <= 0 {
 		log.Fatalln("Must provide input.")
 	}
 	fmt.Printf("Args: %v\n", arg)
-	lr = &LaunchReq{Base: os.Args[1], ProcAttr: os.ProcAttr{}}
-	lr.Path, err = exec.LookPath(lr.Base)
-	if err != nil {
-		return
+	if len(os.Args) > 2 {
+		cmd = exec.Command(os.Args[1], os.Args[2:]...)
+	} else {
+		cmd = exec.Command(os.Args[1], "")
 	}
-	lr.Argv = os.Args[1:]
-	fmt.Printf("%T %#v", lr.Argv, lr.Argv)
+	log.Printf("cmd.Args: %#v", cmd.Args)
+	//	lr = &LaunchReq{Base: os.Args[1], ProcAttr: os.ProcAttr{}}
+	//	l, err = exec.LookPath(os.Args[1])
+	//	if err != nil {
+	//		return
+	//	}
+	//	lr.Args = os.Args[1:]
+	//	fmt.Printf("%T %#v", lr.Argv, lr.Argv)
 	//This is where we redirect the io.Writer
-	lr.ProcAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
+	//	lr.ProcAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
 	return
 }
 
@@ -76,16 +83,25 @@ func cleanInput(arg ...string) (lr *LaunchReq, err error) {
 //blocking on the exit of the cmd
 //Redirects the stderr(which expects an io.Writer) into a channel,
 //which the API is blocking on in order to launch a request.
-func execCmd(cmd *LaunchReq) {
-	process, e := os.StartProcess(cmd.Path, os.Args[1:], &cmd.ProcAttr)
+func execCmd(cmd *exec.Cmd) {
+	stderr, e := cmd.StderrPipe()
 	if e != nil {
+		log.Fatal("Pip conn err: ", e)
+	}
+	reader := bufio.NewReader(stderr)
+	if e := cmd.Start(); e != nil {
 		log.Fatal("Process Start Failed", e)
 	}
-	var procState *os.ProcessState
-	defer log.Printf("Process Exited: %#v", procState)
-	procState, e = process.Wait()
+	processErrs(reader)
+}
 
-	if e != nil {
-		log.Fatal("Err on Exit:", procState, e)
+func processErrs(reader *bufio.Reader) {
+	for {
+		s, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal("Read err", err)
+			return
+		}
+		log.Println("Captured: ", s)
 	}
 }
