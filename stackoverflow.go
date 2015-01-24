@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,7 +12,16 @@ const (
 	ADVANCED_SEARCH_URL = "https://api.stackexchange.com/2.2/search/advanced?"
 )
 
+type Item struct {
+	link        string `json:"link"`
+	title       string `json:"title"`
+	question_id int64  `json:"int"`
+}
+
 type SearchResult struct {
+	items           []Item `json:"items"`
+	quota_max       int    `json:"quota_max"`
+	quota_remaining int    `json:"quota_remaining"`
 }
 
 func Search(query string) {
@@ -34,5 +44,17 @@ func Search(query string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	println(string(body))
+
+	var dat map[string]interface{}
+
+	if err := json.Unmarshal(body, &dat); err != nil {
+		panic(err)
+	}
+
+	for k, v := range dat {
+		println(k)
+		println(v)
+	}
+
+	//println(string(body))
 }
