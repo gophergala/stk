@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -72,6 +73,12 @@ type AnswerResponse struct {
 	} `json:"items"`
 }
 
+type ApiRequest struct {
+	what   string
+	ids    string
+	params *url.Values
+}
+
 type Validator interface {
 	IsValid() bool
 	Error() error
@@ -89,6 +96,25 @@ func (err CommonResponse) Error() error {
 	return fmt.Errorf("Error Id: %v, %v: %v", err.ErrorId, err.ErrorName, err.ErrorMessage)
 }
 
+func makeUrl(request *ApiRequest) string {
+	var buf *bytes.Buffer
+	buf = bytes.NewBufferString(API_BASE)
+	buf.WriteByte('/')
+	buf.WriteString(request.what)
+
+	if len(request.ids) > 0 {
+		buf.WriteByte('/')
+		buf.WriteString(request.ids)
+		buf.WriteByte('/')
+
+	}
+
+	buf.WriteByte('?')
+	buf.WriteString(request.params.Encode())
+
+	return buf.String()
+}
+
 func makeSearchRequest(query string) string {
 	args := url.Values{}
 	args.Set("order", "desc")
@@ -97,7 +123,10 @@ func makeSearchRequest(query string) string {
 	args.Set("accepted", "True")
 	args.Set("q", query)
 
-	return API_BASE + "/search/advanced?" + args.Encode()
+	return makeUrl(&ApiRequest{
+		what:   "search/advanced",
+		params: &args,
+	})
 }
 
 func makeAnswerRequest(answerIds ...int) string {
@@ -115,7 +144,11 @@ func makeAnswerRequest(answerIds ...int) string {
 	args.Set("site", "stackoverflow")
 	args.Set("filter", "withbody")
 
-	return API_BASE + "/answers/" + escaped + "?" + args.Encode()
+	return makeUrl(&ApiRequest{
+		what:   "answers",
+		ids:    escaped,
+		params: &args,
+	})
 }
 
 func get(url string) (body []byte, err error) {
@@ -142,7 +175,6 @@ func load(url string, result Validator) (err error) {
 		err = result.Error()
 	}
 
-	//fmt.Println(result.ErrorId)
 	return
 }
 
