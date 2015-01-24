@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -29,19 +30,31 @@ func init() {
 //  the API call,
 // 4. Get results, prepend file name to whatever the output was from the api
 func main() {
-	//	cmd := cleanInput(os.Args[1:])
-	//This will choke if to cmd are passed at once,ie
-	cmd := cleanInput(os.Args[1:]...)
-	execCmd(&cmd)
+	//This will choke if more than one cmd is passed
+	cmd, err := cleanInput(os.Args[1:]...)
+	if err != nil {
+		log.Fatalf("The provided command is not installed: %T %v",
+			err,
+			err)
+	}
+	execCmd(cmd)
 }
 
 //CleanInput takes all the relevant arguments from os.Args
 //and tries to break it down into an exec.Cmd struct
 //This will need a lot of tuning as it will be fragile
-func cleanInput(arg ...string) exec.Cmd {
+func cleanInput(arg ...string) (cmd *exec.Cmd, err error) {
+	if len(arg) <= 0 {
+		log.Fatalln("Must provide input.")
+	}
 	fmt.Printf("Args: %v\n", arg)
-	//might use os.StartProcess to avoid the
-	return exec.Cmd{}
+	if len(os.Args) > 2 {
+		cmd = exec.Command(os.Args[1], os.Args[2:]...)
+	} else {
+		cmd = exec.Command(os.Args[1], "")
+	}
+	log.Printf("cmd.Args: %#v", cmd.Args)
+	return
 }
 
 //This is going to be the main event loop in all actuality
@@ -50,22 +63,24 @@ func cleanInput(arg ...string) exec.Cmd {
 //Redirects the stderr(which expects an io.Writer) into a channel,
 //which the API is blocking on in order to launch a request.
 func execCmd(cmd *exec.Cmd) {
-	//Make sure the actual command exists, ie go
-	path, err := exec.LookPath(os.Args[1])
-	if err != nil {
-		log.Fatalf("Bloody hell, at least install the command: %s\n",
-			os.Args[1])
-	}
-	fmt.Printf("Yay?%s\n", path)
-	var procAttr os.ProcAttr
-	procAttr.Files = []*os.File{nil, os.Stdout, os.Stderr}
-	process, e := os.StartProcess(path, os.Args[1:], &procAttr)
+	stderr, e := cmd.StderrPipe()
 	if e != nil {
+		log.Fatal("Pip conn err: ", e)
+	}
+	reader := bufio.NewReader(stderr)
+	if e := cmd.Start(); e != nil {
 		log.Fatal("Process Start Failed", e)
 	}
-	procState, errs := process.Wait()
+	processErrs(reader)
+}
 
-	if errs != nil {
-		log.Fatal("Err on Exit:", procState, errs)
+func processErrs(reader *bufio.Reader) {
+	for {
+		s, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal("Read err", err)
+			return
+		}
+		log.Println("Captured: ", s)
 	}
 }
