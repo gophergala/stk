@@ -2,18 +2,41 @@ package main
 
 import (
 	"fmt"
+	"log"
 )
 
 func main() {
-	/*result, _ := Search("drush failed")
-	for _, item := range result.Items {
-		println(item.Title)
-	}*/
+	// LOGIC FOR CAPTURING STDERR
 
-	//printExplanation("TEst", "https://script.fail")
+	reason, url := findReason("drush failed", "", "")
+	printError("Error occured", reason, url)
+}
 
-	printError("Error occured", "Something went wrong", "http://script.fail")
+func findReason(strerr, command, parameters string) (reason string, url string) {
+	res, err := Search(strerr)
 
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(res.Items) == 0 {
+		return "", ""
+	}
+
+	answerId := res.Items[0].AcceptedAnswerId
+	answer, err := GetAnswers(answerId)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(answer.Items) == 0 {
+		return "", ""
+	}
+
+	reason = answer.Items[0].Body
+	url = res.Items[0].Link
+	return
 }
 
 func printError(errstr string, maybeReason string, detailUrl string) {
