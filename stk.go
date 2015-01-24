@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	//	sto "github.com/gophergala/stk/stackoverflow"
 )
 
 func main() {
@@ -23,8 +25,8 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 		return "", ""
 	}
 
-	answerId := res.Items[0].AcceptedAnswerId
-	answer, err := GetAnswers(answerId)
+	answerID := res.Items[0].AcceptedAnswerId
+	answer, err := GetAnswers(answerID)
 
 	if err != nil {
 		log.Fatal(err)
@@ -39,21 +41,27 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	return
 }
 
-func printError(errstr string, maybeReason string, detailUrl string) {
+func printError(errstr string, maybeReason string, detailURL string) {
 	fmt.Println(errstr)
 	fmt.Println()
 	fmt.Println(bold("Possible reason:"))
 	fmt.Println(maybeReason)
 	fmt.Println()
 	fmt.Println(bold("Details: "))
-	fmt.Println(underline(detailUrl))
+	fmt.Println(underline(detailURL))
 	fmt.Println()
 }
 
 func bold(text string) string {
-	return "\033[1m" + text + "\033[0m"
+	if os.Getenv("TERM") == "xterm" {
+		return "\033[1m" + text + "\033[0m"
+	}
+	return text
 }
 
 func underline(text string) string {
-	return "\033[4m" + text + "\033[0m"
+	if os.Getenv("TERM") == "xterm" {
+		return "\033[4m" + text + "\033[0m"
+	}
+	return text
 }

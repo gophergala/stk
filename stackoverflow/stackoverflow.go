@@ -1,4 +1,4 @@
-package main
+package stackoverflow
 
 import (
 	"bytes"
@@ -96,7 +96,7 @@ func (err CommonResponse) Error() error {
 	return fmt.Errorf("Error Id: %v, %v: %v", err.ErrorId, err.ErrorName, err.ErrorMessage)
 }
 
-func makeUrl(request *ApiRequest) string {
+func makeURL(request *ApiRequest) string {
 	var buf *bytes.Buffer
 	buf = bytes.NewBufferString(API_BASE)
 	buf.WriteByte('/')
@@ -123,7 +123,7 @@ func makeSearchRequest(query string) string {
 	args.Set("accepted", "True")
 	args.Set("q", query)
 
-	return makeUrl(&ApiRequest{
+	return makeURL(&ApiRequest{
 		what:   "search/advanced",
 		params: &args,
 	})
@@ -144,7 +144,7 @@ func makeAnswerRequest(answerIds ...int) string {
 	args.Set("site", "stackoverflow")
 	args.Set("filter", "withbody")
 
-	return makeUrl(&ApiRequest{
+	return makeURL(&ApiRequest{
 		what:   "answers",
 		ids:    escaped,
 		params: &args,
@@ -186,6 +186,7 @@ func Search(query string) (*SearchResponse, error) {
 	return result, err
 }
 
+//GetAnswers queries the StackOverflow API and then returns an AnswerResponse struct
 func GetAnswers(ids ...int) (*AnswerResponse, error) {
 	url := makeAnswerRequest(ids...)
 	result := new(AnswerResponse)

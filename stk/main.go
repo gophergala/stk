@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -20,7 +19,7 @@ import (
 
 //Any init code that we need will eventually be put in here
 func init() {
-	fmt.Println("Starting Up.")
+	log.Println("Starting Up.")
 }
 
 //the main loop is probably going to look like:
@@ -47,7 +46,7 @@ func cleanInput(arg ...string) (cmd *exec.Cmd, err error) {
 	if len(arg) <= 0 {
 		log.Fatalln("Must provide input.")
 	}
-	fmt.Printf("Args: %v\n", arg)
+	log.Printf("Args: %v\n", arg)
 	if len(os.Args) > 2 {
 		cmd = exec.Command(os.Args[1], os.Args[2:]...)
 	} else {
@@ -71,9 +70,15 @@ func execCmd(cmd *exec.Cmd) {
 	if e := cmd.Start(); e != nil {
 		log.Fatal("Process Start Failed", e)
 	}
-	processErrs(reader)
+	go processErrs(reader)
+
+	if err := cmd.Wait(); err != nil {
+		//Type is exit error
+		log.Fatal(err)
+	}
 }
 
+//processErrs is the function that launches the requests to the API
 func processErrs(reader *bufio.Reader) {
 	for {
 		s, err := reader.ReadString('\n')
