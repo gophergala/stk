@@ -3,13 +3,28 @@ package main
 import (
 	"fmt"
 	"log"
+	"regexp"
 )
+
+var nohtml *regexp.Regexp
+
+func init() {
+	nohtml, _ = regexp.Compile("<[^>]*>")
+}
+
+func stripHtml(htmlContent string) string {
+	return nohtml.ReplaceAllString(htmlContent, "")
+}
 
 func main() {
 	// LOGIC FOR CAPTURING STDERR
 
-	reason, url := findReason("drush failed", "", "")
-	printError("Error occured", reason, url)
+	stderr := "The drush command could not be found"
+
+	reason, url := findReason(stderr, "", "")
+	sanitized := stripHtml(reason)
+
+	printError(stderr, sanitized, url)
 }
 
 func findReason(strerr, command, parameters string) (reason string, url string) {
@@ -25,6 +40,8 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 
 	answerId := res.Items[0].AcceptedAnswerId
 	answer, err := GetAnswers(answerId)
+
+	log.Print(answerId)
 
 	if err != nil {
 		log.Fatal(err)
