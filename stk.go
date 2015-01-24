@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	//	sto "github.com/gophergala/stk/stackoverflow"
+
+	sto "github.com/gophergala/stk/stackoverflow"
 )
+
+//could use the command as a possible tag
 
 func main() {
 	// LOGIC FOR CAPTURING STDERR
@@ -15,7 +18,7 @@ func main() {
 }
 
 func findReason(strerr, command, parameters string) (reason string, url string) {
-	res, err := Search(strerr)
+	res, err := sto.Search(strerr)
 
 	if err != nil {
 		log.Fatal(err)
@@ -26,7 +29,7 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	}
 
 	answerID := res.Items[0].AcceptedAnswerId
-	answer, err := GetAnswers(answerID)
+	answer, err := sto.GetAnswers(answerID)
 
 	if err != nil {
 		log.Fatal(err)

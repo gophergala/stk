@@ -64,7 +64,7 @@ func cleanInput(arg ...string) (cmd *exec.Cmd, err error) {
 func execCmd(cmd *exec.Cmd) {
 	stderr, e := cmd.StderrPipe()
 	if e != nil {
-		log.Fatal("Pip conn err: ", e)
+		log.Fatal("Pipe conn err: ", e)
 	}
 	reader := bufio.NewReader(stderr)
 	if e := cmd.Start(); e != nil {
