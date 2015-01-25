@@ -1,7 +1,7 @@
 STK
 ======
 
-**stk** is a command line tool that allows to capture stderr and search for a reason on http://stackoverflow.com
+**stk** is a command line tool that captures stderr and search for a reason on http://stackoverflow.com
 
 ```
 $ stk mysql -u root -ptest
