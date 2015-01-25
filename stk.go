@@ -57,7 +57,7 @@ func init() {
 
 }
 
-func stripHtml(htmlContent string) string {
+func stripHTML(htmlContent string) string {
 	return nohtml.ReplaceAllString(htmlContent, "")
 }
 
@@ -150,7 +150,7 @@ func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
 		s := scanner.Text()
 		log.Println("Captured: ", s)
 		reason, url := findReason(s, (*commandArgs)[0], "")
-		printError("Error Captured:", stripHtml(reason), url)
+		printError("Error Captured:", stripHTML(reason), url)
 		if *errFileFlag {
 			n, e := writer.WriteString(s + "\n")
 			if e != nil {
@@ -188,7 +188,7 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	}
 
 	if len(res.Items) == 0 {
-		return "", ""
+		return
 	}
 
 	answerID := res.Items[0].AcceptedAnswerID
@@ -199,7 +199,7 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	}
 
 	if len(answer.Items) == 0 {
-		return "", ""
+		return
 	}
 
 	reason = answer.Items[0].Body
