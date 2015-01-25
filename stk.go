@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"time"
 
@@ -46,7 +45,6 @@ var (
 	cmd         *exec.Cmd
 	err         error
 	errFile     *os.File
-	nohtml      *regexp.Regexp
 	commands    Adjusted
 )
 
@@ -67,14 +65,10 @@ func init() {
 		}
 	}
 	log.Printf("Starting Up. %#v", commandArgs)
-	nohtml, _ = regexp.Compile("<[^>]*>")
+	//nohtml, _ = regexp.Compile("<[^>]*>")
 
 	initPopularCommands()
 
-}
-
-func stripHTML(htmlContent string) string {
-	return nohtml.ReplaceAllString(htmlContent, "")
 }
 
 //the main loop is probably going to look like:
@@ -280,28 +274,6 @@ func printError(errstr string, reason *MaybeReason) {
 	fmt.Print(bold("URL: "))
 	fmt.Println(underline(reason.URL))
 	fmt.Println()
-}
-
-func xterm(code string) func(s string) string {
-	env := os.Getenv("TERM")
-	isXterm := strings.Contains(env, "xterm")
-
-	return func(text string) (output string) {
-		if isXterm {
-			output = code + text + "\033[0m"
-		} else {
-			output = text
-		}
-		return
-	}
-}
-
-func bold(text string) string {
-	return xterm("\033[1m")(text)
-}
-
-func underline(text string) string {
-	return xterm("\033[4m")(text)
 }
 
 // init tags for popular commands
