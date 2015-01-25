@@ -26,16 +26,19 @@ import (
 //To truly get stderr, we would need to intercept any write call to the STDERR
 //But that's hard, so we are going to use exec.Cmd on the first go around.
 
+type QueryAdjust struct {
+	SiteID string
+	Tags   []string
+}
+
 var (
-	errFileFlag = kingpin.Flag("errFile",
-		"Output errors to a file in the pwd with the timestamp for a name.").Default("false").Short('e').Bool()
-	commandArgs = kingpin.Arg("command", "Command being run").
-			Required().
-			Strings()
-	cmd     *exec.Cmd
-	err     error
-	errFile *os.File
-	nohtml  *regexp.Regexp
+	errFileFlag = kingpin.Flag("errFile", "Output errors to a file in the pwd with the timestamp for a name.").Default("false").Short('e').Bool()
+	commandArgs = kingpin.Arg("command", "Command being run").Required().Strings()
+	cmd         *exec.Cmd
+	err         error
+	errFile     *os.File
+	nohtml      *regexp.Regexp
+	commands    map[string]*QueryAdjust
 )
 
 //Any init code that we need will eventually be put in here
@@ -54,6 +57,8 @@ func init() {
 	}
 	log.Printf("Starting Up. %#v", commandArgs)
 	nohtml, _ = regexp.Compile("<[^>]*>")
+
+	initPopularCommands()
 
 }
 
@@ -181,7 +186,17 @@ func passStdOut(r *bufio.Reader) {
 }
 
 func findReason(strerr, command, parameters string) (reason string, url string) {
-	res, err := sto.Search(strerr)
+	site := "unix"
+
+	req := sto.SearchRequestBuilder.
+		Query(strerr).
+		AddTag(command).
+		SiteID(site).
+		Accepted(true).
+		Sort("activity").
+		Build()
+
+	res, err := sto.Search(&req)
 
 	if err != nil {
 		log.Fatal(err)
@@ -192,7 +207,13 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	}
 
 	answerID := res.Items[0].AcceptedAnswerID
-	answer, err := sto.GetAnswers(answerID)
+	reqa := sto.AnswerRequestBuilder.
+		AddAnswerID(answerID).
+		Sort("activity").
+		SiteID(site).
+		Build()
+
+	answer, err := sto.GetAnswers(&reqa)
 
 	if err != nil {
 		log.Fatal(err)
@@ -201,6 +222,8 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	if len(answer.Items) == 0 {
 		return
 	}
+
+	log.Println("remains API calls", answer.QuotaRemaining)
 
 	reason = answer.Items[0].Body
 	url = res.Items[0].Link
@@ -238,4 +261,7 @@ func bold(text string) string {
 
 func underline(text string) string {
 	return xterm("\033[4m")(text)
+}
+
+func initPopularCommands() {
 }

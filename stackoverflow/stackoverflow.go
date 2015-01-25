@@ -1,14 +1,10 @@
 package stackoverflow
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -16,7 +12,6 @@ const (
 	APIBase = "https://api.stackexchange.com/2.2"
 )
 
-//CommonResponse is ...
 type CommonResponse struct {
 	ErrorID      int    `json:"error_id"`
 	ErrorMessage string `json:"error_message"`
@@ -28,19 +23,20 @@ type CommonResponse struct {
 	HasMore bool `json:"has_more"`
 }
 
-//SearchResponse is ...
+type Owner struct {
+	Reputation   int    `json:"reputation"`
+	UserID       int    `json:"user_id"`
+	UserType     string `json:"user_type"`
+	ProfileImage string `json:"profile_image"`
+	DisplayName  string `json:"display_name"`
+	Link         string `json:"link"`
+}
+
 type SearchResponse struct {
 	CommonResponse
 	Items []struct {
-		Tags  []string `json:"tags"`
-		Owner struct {
-			Reputation   int    `json:"reputation"`
-			UserID       int    `json:"user_id"`
-			UserType     string `json:"user_type"`
-			ProfileImage string `json:"profile_image"`
-			DisplayName  string `json:"display_name"`
-			Link         string `json:"link"`
-		} `json:"owner"`
+		Tags             []string `json:"tags"`
+		Owner            `json:"owner"`
 		IsAnswered       bool   `json:"is_answered"`
 		ViewCount        int    `json:"view_count"`
 		AnswerCount      int    `json:"answer_count"`
@@ -54,19 +50,10 @@ type SearchResponse struct {
 	} `json:"items"`
 }
 
-//AnswerResponse is ...
 type AnswerResponse struct {
 	CommonResponse
 	Items []struct {
-		Owner struct {
-			Reputation   int    `json:"reputation"`
-			UserID       int    `json:"user_id"`
-			UserType     string `json:"user_type"`
-			AcceptRate   int    `json:"accept_rate"`
-			ProfileImage string `json:"profile_image"`
-			DisplayName  string `json:"display_name"`
-			Link         string `json:"link"`
-		} `json:"owner"`
+		Owner            `json:"owner"`
 		IsAccepted       bool   `json:"is_accepted"`
 		Score            int    `json:"score"`
 		LastActivityDate int    `json:"last_activity_date"`
@@ -77,20 +64,11 @@ type AnswerResponse struct {
 	} `json:"items"`
 }
 
-//APIRequest is ...
-type APIRequest struct {
-	what   string
-	ids    string
-	params *url.Values
-}
-
-//Validator is ...
 type Validator interface {
 	IsValid() bool
 	Error() error
 }
 
-//IsValid ...
 func (res CommonResponse) IsValid() bool {
 	if res.ErrorID > 0 || res.QuotaRemaining == 0 {
 		return false
@@ -99,64 +77,8 @@ func (res CommonResponse) IsValid() bool {
 	return true
 }
 
-//Error ...
 func (res CommonResponse) Error() error {
 	return fmt.Errorf("Error Id: %v, %v: %v", res.ErrorID, res.ErrorName, res.ErrorMessage)
-}
-
-func makeURL(request *APIRequest) string {
-	var buf *bytes.Buffer
-	buf = bytes.NewBufferString(APIBase)
-	buf.WriteByte('/')
-	buf.WriteString(request.what)
-
-	if len(request.ids) > 0 {
-		buf.WriteByte('/')
-		buf.WriteString(request.ids)
-		buf.WriteByte('/')
-
-	}
-
-	buf.WriteByte('?')
-	buf.WriteString(request.params.Encode())
-
-	return buf.String()
-}
-
-func makeSearchRequest(query string) string {
-	args := url.Values{}
-	args.Set("order", "desc")
-	args.Set("sort", "activity")
-	args.Set("site", "stackoverflow")
-	args.Set("accepted", "True")
-	args.Set("q", query)
-
-	return makeURL(&APIRequest{
-		what:   "search/advanced",
-		params: &args,
-	})
-}
-
-func makeAnswerRequest(answerIds ...int) string {
-	var ids = make([]string, len(answerIds))
-
-	for i, val := range answerIds {
-		ids[i] = strconv.Itoa(val)
-	}
-
-	escaped := url.QueryEscape(strings.Join(ids, ";"))
-
-	args := url.Values{}
-	args.Set("order", "desc")
-	args.Set("sort", "activity")
-	args.Set("site", "stackoverflow")
-	args.Set("filter", "withbody")
-
-	return makeURL(&APIRequest{
-		what:   "answers",
-		ids:    escaped,
-		params: &args,
-	})
 }
 
 func get(url string) (body []byte, err error) {
@@ -186,18 +108,16 @@ func load(url string, result Validator) (err error) {
 	return
 }
 
-//Search ...
-func Search(query string) (*SearchResponse, error) {
-	url := makeSearchRequest(query)
+func Search(request *SearchRequest) (*SearchResponse, error) {
+	url := makeSearchRequest(request)
 	result := new(SearchResponse)
 	err := load(url, result)
 
 	return result, err
 }
 
-//GetAnswers queries the StackOverflow API and then returns an AnswerResponse struct
-func GetAnswers(ids ...int) (*AnswerResponse, error) {
-	url := makeAnswerRequest(ids...)
+func GetAnswers(request *AnswerRequest) (*AnswerResponse, error) {
+	url := makeAnswerRequest(request)
 	result := new(AnswerResponse)
 	err := load(url, result)
 
