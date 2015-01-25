@@ -33,5 +33,5 @@ A project made for Gopher Gala by [Igor Vasilcovsky](https://github.com/vasilcov
 
 
 ##Dependencies (outside the std lib)
-* [Kingpin](https://github.com/alecthomas/kingpin)
-* [Builder] (https://github.com/lann/builder)
+* [Kingpin](https://github.com/alecthomas/kingpin) - A Go (golang) command line and flag parser
+* [Builder] (https://github.com/lann/builder) - fluent immutable builders for Go
