@@ -55,7 +55,6 @@ func makeURL(request *apiRequest) string {
 
 func makeSearchRequest(request *SearchRequest) string {
 	tagged := strings.Join(request.Tags, ";")
-	tagged = url.QueryEscape(tagged)
 
 	args := url.Values{}
 	args.Set("order", "desc")

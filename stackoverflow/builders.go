@@ -27,6 +27,10 @@ func (b searchReqBuilder) Accepted(flag bool) searchReqBuilder {
 	return builder.Set(b, "Accepted", flag).(searchReqBuilder)
 }
 
+func (b searchReqBuilder) Tags(tags []string) searchReqBuilder {
+	return builder.Set(b, "Tags", tags).(searchReqBuilder)
+}
+
 func (b searchReqBuilder) Build() SearchRequest {
 	return builder.GetStruct(b).(SearchRequest)
 }

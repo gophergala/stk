@@ -27,6 +27,12 @@ import (
 //To truly get stderr, we would need to intercept any write call to the STDERR
 //But that's hard, so we are going to use exec.Cmd on the first go around.
 
+type MaybeReason struct {
+	Title  string
+	Reason string
+	URL    string
+}
+
 type QueryAdjust struct {
 	SiteID string
 	Tags   []string
@@ -161,9 +167,10 @@ func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
 	for scanner.Scan() {
 		s := scanner.Text()
 		log.Println("Captured: ", s)
-		reason, url := findReason(s, (*commandArgs)[0], "")
 
-		printError(s, stripHTML(reason), url)
+		maybeReason := findReason(s, (*commandArgs)[0], "")
+
+		printError(s, maybeReason)
 
 		if *errFileFlag {
 			n, e := writer.WriteString(s + "\n")
@@ -194,12 +201,19 @@ func passStdOut(r *bufio.Reader) {
 	}
 }
 
-func findReason(strerr, command, parameters string) (reason string, url string) {
+func findReason(strerr, command, parameters string) *MaybeReason {
 	site := "stackoverflow"
+	tags := []string{}
+
+	adj, ok := commands[command]
+	if ok {
+		site = adj.SiteID
+		tags = adj.Tags
+	}
 
 	req := sto.SearchRequestBuilder.
 		Query(strerr).
-		AddTag(command).
+		Tags(tags).
 		SiteID(site).
 		Accepted(true).
 		Sort("relevance").
@@ -212,10 +226,24 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	}
 
 	if len(res.Items) == 0 {
-		return
+		log.Println("empty search results from stackoverflow")
+		return nil
 	}
 
-	answerID := res.Items[0].AcceptedAnswerID
+	var answerID int
+
+	for _, item := range res.Items {
+		if item.AcceptedAnswerID > 0 {
+			answerID = item.AcceptedAnswerID
+			break
+		}
+	}
+
+	if answerID == 0 {
+		log.Println("accepted answer id was not found")
+		return nil
+	}
+
 	reqa := sto.AnswerRequestBuilder.
 		AddAnswerID(answerID).
 		SiteID(site).
@@ -228,24 +256,29 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	}
 
 	if len(answer.Items) == 0 {
-		return
+		return nil
 	}
 
 	log.Println("remains API calls", answer.QuotaRemaining)
 
-	reason = answer.Items[0].Body
-	url = res.Items[0].Link
-	return
+	return &MaybeReason{
+		Title:  res.Items[0].Title,
+		Reason: answer.Items[0].Body,
+		URL:    res.Items[0].Link,
+	}
 }
 
-func printError(errstr string, maybeReason string, detailURL string) {
+func printError(errstr string, reason *MaybeReason) {
 	fmt.Println(errstr)
 	fmt.Println()
-	fmt.Println(bold("Possible reason:"))
-	fmt.Println(maybeReason)
+	fmt.Println(bold("Similar from Stackoverflow:"))
+	fmt.Println(reason.Title)
 	fmt.Println()
-	fmt.Println(bold("Details: "))
-	fmt.Println(underline(detailURL))
+	fmt.Println(bold("Accepted solution:"))
+	fmt.Println(stripHTML(reason.Reason))
+	fmt.Println()
+	fmt.Print(bold("URL: "))
+	fmt.Println(underline(reason.URL))
 	fmt.Println()
 }
 
