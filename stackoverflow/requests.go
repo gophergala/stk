@@ -2,6 +2,7 @@ package stackoverflow
 
 import (
 	"bytes"
+	"log"
 	"net/url"
 	"strconv"
 	"strings"
@@ -17,7 +18,6 @@ type SearchRequest struct {
 
 type AnswerRequest struct {
 	AnswerIDS []int
-	Sort      string
 	SiteID    string
 }
 
@@ -40,22 +40,32 @@ func makeURL(request *apiRequest) string {
 
 	}
 
+	// add stackoverflow key
+	// according to StackoverFlow API
+	// This is not considered a secret, and may be safely embed in client side code or distributed binaries.
+	request.params.Set("key", "vfuajcl*3rqAKABKGqWsGA((")
+
 	buf.WriteByte('?')
 	buf.WriteString(request.params.Encode())
+
+	log.Println(buf.String())
 
 	return buf.String()
 }
 
 func makeSearchRequest(request *SearchRequest) string {
+	tagged := strings.Join(request.Tags, ";")
+	tagged = url.QueryEscape(tagged)
+
 	args := url.Values{}
 	args.Set("order", "desc")
 	args.Set("sort", request.Sort)
 	args.Set("site", request.SiteID)
-	args.Set("accepted", strconv.FormatBool(request.Accepted))
-	args.Set("q", request.Query)
+	args.Set("title", request.Query)
+	args.Set("tagged", tagged)
 
 	return makeURL(&apiRequest{
-		what:   "search/advanced",
+		what:   "similar",
 		params: &args,
 	})
 }
@@ -72,7 +82,6 @@ func makeAnswerRequest(request *AnswerRequest) string {
 	args := url.Values{}
 	args.Set("order", "desc")
 	args.Set("filter", "withbody")
-	args.Set("sort", request.Sort)
 	args.Set("site", request.SiteID)
 
 	return makeURL(&apiRequest{

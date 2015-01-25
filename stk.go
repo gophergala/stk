@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -31,6 +32,8 @@ type QueryAdjust struct {
 	Tags   []string
 }
 
+type Adjusted map[string]*QueryAdjust
+
 var (
 	errFileFlag = kingpin.Flag("errFile", "Output errors to a file in the pwd with the timestamp for a name.").Default("false").Short('e').Bool()
 	commandArgs = kingpin.Arg("command", "Command being run").Required().Strings()
@@ -38,11 +41,13 @@ var (
 	err         error
 	errFile     *os.File
 	nohtml      *regexp.Regexp
-	commands    map[string]*QueryAdjust
+	commands    Adjusted
 )
 
 //Any init code that we need will eventually be put in here
 func init() {
+	log.SetOutput(ioutil.Discard)
+
 	kingpin.Parse()
 	cleanInput()
 	if cmd.Path == "" {
@@ -147,15 +152,19 @@ func execCmd() {
 //processErrs is the function that launches the requests to the API
 func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
 	var writer *bufio.Writer
+
 	if *errFileFlag {
 		writer = bufio.NewWriter(errFile)
 	}
+
 	//TODO (broluwo):FAULTY LOGIC SOMEWHERE BELOW
 	for scanner.Scan() {
 		s := scanner.Text()
 		log.Println("Captured: ", s)
 		reason, url := findReason(s, (*commandArgs)[0], "")
-		printError("Error Captured:", stripHTML(reason), url)
+
+		printError(s, stripHTML(reason), url)
+
 		if *errFileFlag {
 			n, e := writer.WriteString(s + "\n")
 			if e != nil {
@@ -186,14 +195,14 @@ func passStdOut(r *bufio.Reader) {
 }
 
 func findReason(strerr, command, parameters string) (reason string, url string) {
-	site := "unix"
+	site := "stackoverflow"
 
 	req := sto.SearchRequestBuilder.
 		Query(strerr).
 		AddTag(command).
 		SiteID(site).
 		Accepted(true).
-		Sort("activity").
+		Sort("relevance").
 		Build()
 
 	res, err := sto.Search(&req)
@@ -209,7 +218,6 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 	answerID := res.Items[0].AcceptedAnswerID
 	reqa := sto.AnswerRequestBuilder.
 		AddAnswerID(answerID).
-		Sort("activity").
 		SiteID(site).
 		Build()
 
@@ -263,5 +271,25 @@ func underline(text string) string {
 	return xterm("\033[4m")(text)
 }
 
+// init tags for popular commands
 func initPopularCommands() {
+	commands = make(Adjusted)
+
+	populate := func(site string, tags []string, cmds string) {
+		tag := &QueryAdjust{SiteID: site, Tags: tags}
+		for _, cmd := range strings.Split(cmds, " ") {
+			commands[cmd] = tag
+		}
+	}
+
+	populate("stackoverflow", []string{"bash", "shell"}, "alias apropos apt-get aptitude aspell awk basename bash bc bg break builtin bzip2 cal case cat cd cfdisk chgrp chmod chown chroot chkconfig cksum clear cmp comm command continue cp cron crontab csplit cut date dc dd ddrescue declare df diff diff3 dig dir dircolors dirname dirs dmesg du echo egrep eject enable env ethtool eval exec exit expect expand export expr false fdformat fdisk fg fgrep file find fmt fold for format free fsck ftp function fuser gawk getopts grep groupadd groupdel groupmod groups gzip hash head help history hostname iconv id if ifconfig ifdown ifup import install jobs join kill killall less let link ln local locate logname logout look lpc lpr lprint lprintd lprintq lprm ls lsof make man mkdir mkfifo mkisofs mknod more most mount mtools mtr mv mmv netstat nice nl nohup notify-send nslookup open op passwd paste pathchk ping pkill popd pr printcap printenv printf ps pushd pv pwd quota quotacheck quotactl ram rcp read readarray readonly reboot rename renice remsync return rev rm rmdir rsync screen scp sdiff sed select seq set sftp shift shopt shutdown sleep slocate sort source split ssh stat strace su sudo sum suspend sync tail tar tee test time timeout times touch top traceroute trap tr true tsort tty type ulimit umask umount unalias uname unexpand uniq units unset unshar useradd userdel usermod users uuencode uudecode v vdir vi vmstat wait watch wc whereis which while who whoami wget write xargs xdg-open yes zip")
+	populate("stackoverflow", []string{"mysql"}, "mysql mysqld mysqladmin mysqlcheck mysqldump mysqlimport mysqlshow")
+	populate("stackoverflow", []string{"postgres"}, "clusterdb createdb createlang createuser dropdb droplang dropuser ecpg initdb oid2name pg_archivecleanup pg_basebackup pg_config pg_controldata pg_ctl pg_dump pg_dumpall pg_receivexlog pg_resetxlog pg_restore pg_standby pg_test_fsync pg_test_timing pg_upgrade pgbench postgres postmaster psql reindexdb vacuumdb vacuumlo")
+	populate("stackoverflow", []string{"mongodb", "nosql"}, "mongo mongod mongos mongodump mongorestore mongostat mongoexport mongoimport bsondump mongofiles mongotop mongosniff")
+	populate("stackoverflow", []string{"python"}, "python pip easy_install django-admin.py manage.py")
+	populate("stackoverflow", []string{"nodejs"}, "nodejs pm2 node npm bower")
+	populate("stackoverflow", []string{"drupal", "drush"}, "drush")
+	populate("stackoverflow", []string{"java"}, "java javac javap")
+
+	log.Println("loaded", len(commands), "commands")
 }

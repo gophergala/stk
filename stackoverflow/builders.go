@@ -42,10 +42,6 @@ func (b answersReqBuilder) SiteID(v string) answersReqBuilder {
 	return builder.Set(b, "SiteID", v).(answersReqBuilder)
 }
 
-func (b answersReqBuilder) Sort(v string) answersReqBuilder {
-	return builder.Set(b, "Sort", v).(answersReqBuilder)
-}
-
 func (b answersReqBuilder) Build() AnswerRequest {
 	return builder.GetStruct(b).(AnswerRequest)
 }
