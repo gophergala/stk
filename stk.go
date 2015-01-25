@@ -50,7 +50,6 @@ var (
 //Any init code that we need will eventually be put in here
 func init() {
 	log.SetOutput(ioutil.Discard)
-
 	initPopularCommands()
 }
 
@@ -121,7 +120,7 @@ func execCmd(cmd *exec.Cmd) {
 	}
 	errChan := make(chan string)
 	go passStdOut(r)
-	go processErrs(reader, errChan)
+	go processErrs(cmd.Args[0], reader, errChan)
 
 	//Problem? If the command exits it passes back a Proc state to err which will prompt an exit before the go routine can even process.
 	//Solution is channels.
@@ -142,7 +141,7 @@ func execCmd(cmd *exec.Cmd) {
 }
 
 //processErrs is the function that launches the requests to the API
-func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
+func processErrs(cmd string, scanner *bufio.Scanner, errChan chan<- string) {
 	var writer *bufio.Writer
 
 	if *errFileFlag {
@@ -154,7 +153,7 @@ func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
 		s := scanner.Text()
 		log.Println("Captured: ", s)
 
-		maybeReason := findReason(s, "")
+		maybeReason := findReason(s, cmd)
 
 		printError(s, maybeReason)
 
