@@ -42,7 +42,6 @@ type Adjusted map[string]*QueryAdjust
 var (
 	errFileFlag = kingpin.Flag("errFile", "Output errors to a file in the pwd with the timestamp for a name.").Default("false").Short('e').Bool()
 	commandArgs = kingpin.Arg("command", "Command being run").Required().Strings()
-	cmd         *exec.Cmd
 	err         error
 	errFile     *os.File
 	commands    Adjusted
@@ -52,8 +51,14 @@ var (
 func init() {
 	log.SetOutput(ioutil.Discard)
 
-	kingpin.Parse()
-	cleanInput()
+	initPopularCommands()
+}
+
+func main() {
+	//kingpin.Parse()
+
+	cmd := cleanInput()
+
 	if cmd.Path == "" {
 		log.Fatalln("The provided command is not installed")
 	}
@@ -65,45 +70,32 @@ func init() {
 		}
 	}
 	log.Printf("Starting Up. %#v", commandArgs)
-	//nohtml, _ = regexp.Compile("<[^>]*>")
 
-	initPopularCommands()
-
-}
-
-//the main loop is probably going to look like:
-//1.Process provided string into an executable command
-//2.Exec them
-//3.Have a go routine running to capture any err output then pass them off to
-//  the API call,
-// 4. Get results, prepend file name to whatever the output was from the api
-func main() {
 	if *errFileFlag {
 		defer errFile.Close()
 	}
+
 	//This will choke if more than one cmd is passed
-	execCmd()
-	//	stderr := "The drush command could not be found"
-
-	//	reason, url := findReason(stderr, "", "")
-	//	sanitized := stripHtml(reason)
-
-	//	printError(stderr, sanitized, url)
+	execCmd(cmd)
 }
 
 //CleanInput takes all the relevant arguments from os.Args
 //and tries to break it down into an exec.Cmd struct
 //This will need a lot of tuning as it will be fragile
-func cleanInput() {
-	if len(*commandArgs) <= 0 {
+func cleanInput() (cmd *exec.Cmd) {
+	if len(os.Args) <= 1 {
 		log.Fatalln("Must provide input.")
 	}
-	if len(os.Args) > 2 {
-		cmd = exec.Command((*commandArgs)[0], (*commandArgs)[1:]...)
+
+	args := os.Args[1:]
+
+	if len(args) > 2 {
+		cmd = exec.Command(args[0], args[1:]...)
 	} else {
-		cmd = exec.Command((*commandArgs)[0])
+		cmd = exec.Command(args[0])
 	}
-	log.Printf("cmd.Args: %#v", cmd.Args)
+	log.Printf("cmd.Args: %#v", args)
+
 	return
 }
 
@@ -112,7 +104,7 @@ func cleanInput() {
 //blocking on the exit of the cmd
 //Redirects the stderr(which expects an io.Writer) into a channel,
 //which the API is blocking on in order to launch a request.
-func execCmd() {
+func execCmd(cmd *exec.Cmd) {
 	stderr, e := cmd.StderrPipe()
 	if e != nil {
 		log.Fatal("Pipe conn err: ", e)
@@ -125,7 +117,7 @@ func execCmd() {
 	}
 	r := bufio.NewReader(stdout)
 	if e := cmd.Start(); e != nil {
-		log.Fatal("Process Start Failed", e)
+		log.Fatalf("Process Start Failed", e)
 	}
 	errChan := make(chan string)
 	go passStdOut(r)
@@ -162,7 +154,7 @@ func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
 		s := scanner.Text()
 		log.Println("Captured: ", s)
 
-		maybeReason := findReason(s, (*commandArgs)[0])
+		maybeReason := findReason(s, "")
 
 		printError(s, maybeReason)
 
