@@ -7,9 +7,14 @@ import (
 )
 
 var nohtml *regexp.Regexp = regexp.MustCompile("<[^>]*>")
+var wrongQuote *regexp.Regexp = regexp.MustCompile("&#39;")
 
 func stripHTML(htmlContent string) string {
 	return nohtml.ReplaceAllString(htmlContent, "")
+}
+
+func fixQuotes(content string) string {
+	return wrongQuote.ReplaceAllString(content, "'")
 }
 
 func xterm(code string) func(s string) string {

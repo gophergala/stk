@@ -162,7 +162,7 @@ func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
 		s := scanner.Text()
 		log.Println("Captured: ", s)
 
-		maybeReason := findReason(s, (*commandArgs)[0], "")
+		maybeReason := findReason(s, (*commandArgs)[0])
 
 		printError(s, maybeReason)
 
@@ -195,9 +195,9 @@ func passStdOut(r *bufio.Reader) {
 	}
 }
 
-func findReason(strerr, command, parameters string) *MaybeReason {
+func findReason(strerr, command string) *MaybeReason {
 	site := "stackoverflow"
-	tags := []string{}
+	tags := []string{command}
 
 	adj, ok := commands[command]
 	if ok {
@@ -266,7 +266,7 @@ func printError(errstr string, reason *MaybeReason) {
 	fmt.Println(errstr)
 	fmt.Println()
 	fmt.Println(bold("Similar from Stackoverflow:"))
-	fmt.Println(reason.Title)
+	fmt.Println(fixQuotes(reason.Title))
 	fmt.Println()
 	fmt.Println(bold("Accepted solution:"))
 	fmt.Println(stripHTML(reason.Reason))
