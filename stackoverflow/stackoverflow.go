@@ -12,11 +12,13 @@ import (
 )
 
 const (
-	API_BASE = "https://api.stackexchange.com/2.2"
+	//APIBase is the base URL for the StackOverflow API
+	APIBase = "https://api.stackexchange.com/2.2"
 )
 
+//CommonResponse is ...
 type CommonResponse struct {
-	ErrorId      int    `json:"error_id"`
+	ErrorID      int    `json:"error_id"`
 	ErrorMessage string `json:"error_message"`
 	ErrorName    string `json:"error_name"`
 
@@ -26,13 +28,14 @@ type CommonResponse struct {
 	HasMore bool `json:"has_more"`
 }
 
+//SearchResponse is ...
 type SearchResponse struct {
 	CommonResponse
 	Items []struct {
 		Tags  []string `json:"tags"`
 		Owner struct {
 			Reputation   int    `json:"reputation"`
-			UserId       int    `json:"user_id"`
+			UserID       int    `json:"user_id"`
 			UserType     string `json:"user_type"`
 			ProfileImage string `json:"profile_image"`
 			DisplayName  string `json:"display_name"`
@@ -41,22 +44,23 @@ type SearchResponse struct {
 		IsAnswered       bool   `json:"is_answered"`
 		ViewCount        int    `json:"view_count"`
 		AnswerCount      int    `json:"answer_count"`
-		AcceptedAnswerId int    `json:"accepted_answer_id"`
+		AcceptedAnswerID int    `json:"accepted_answer_id"`
 		Score            int    `json:"score"`
 		LastActivityDate int    `json:"last_activity_date"`
 		CreationDate     int    `json:"creation_date"`
-		QuestionId       int    `json:"question_id"`
+		QuestionID       int    `json:"question_id"`
 		Link             string `json:"link"`
 		Title            string `json:"title"`
 	} `json:"items"`
 }
 
+//AnswerResponse is ...
 type AnswerResponse struct {
 	CommonResponse
 	Items []struct {
 		Owner struct {
 			Reputation   int    `json:"reputation"`
-			UserId       int    `json:"user_id"`
+			UserID       int    `json:"user_id"`
 			UserType     string `json:"user_type"`
 			AcceptRate   int    `json:"accept_rate"`
 			ProfileImage string `json:"profile_image"`
@@ -67,38 +71,42 @@ type AnswerResponse struct {
 		Score            int    `json:"score"`
 		LastActivityDate int    `json:"last_activity_date"`
 		CreationDate     int    `json:"creation_date"`
-		AnswerId         int    `json:"answer_id"`
-		QuestionId       int    `json:"question_id"`
+		AnswerID         int    `json:"answer_id"`
+		QuestionID       int    `json:"question_id"`
 		Body             string `json:"body"`
 	} `json:"items"`
 }
 
-type ApiRequest struct {
+//APIRequest is ...
+type APIRequest struct {
 	what   string
 	ids    string
 	params *url.Values
 }
 
+//Validator is ...
 type Validator interface {
 	IsValid() bool
 	Error() error
 }
 
+//IsValid ...
 func (res CommonResponse) IsValid() bool {
-	if res.ErrorId > 0 || res.QuotaRemaining == 0 {
+	if res.ErrorID > 0 || res.QuotaRemaining == 0 {
 		return false
 	}
 
 	return true
 }
 
-func (err CommonResponse) Error() error {
-	return fmt.Errorf("Error Id: %v, %v: %v", err.ErrorId, err.ErrorName, err.ErrorMessage)
+//Error ...
+func (res CommonResponse) Error() error {
+	return fmt.Errorf("Error Id: %v, %v: %v", res.ErrorID, res.ErrorName, res.ErrorMessage)
 }
 
-func makeURL(request *ApiRequest) string {
+func makeURL(request *APIRequest) string {
 	var buf *bytes.Buffer
-	buf = bytes.NewBufferString(API_BASE)
+	buf = bytes.NewBufferString(APIBase)
 	buf.WriteByte('/')
 	buf.WriteString(request.what)
 
@@ -123,7 +131,7 @@ func makeSearchRequest(query string) string {
 	args.Set("accepted", "True")
 	args.Set("q", query)
 
-	return makeURL(&ApiRequest{
+	return makeURL(&APIRequest{
 		what:   "search/advanced",
 		params: &args,
 	})
@@ -144,7 +152,7 @@ func makeAnswerRequest(answerIds ...int) string {
 	args.Set("site", "stackoverflow")
 	args.Set("filter", "withbody")
 
-	return makeURL(&ApiRequest{
+	return makeURL(&APIRequest{
 		what:   "answers",
 		ids:    escaped,
 		params: &args,
@@ -178,6 +186,7 @@ func load(url string, result Validator) (err error) {
 	return
 }
 
+//Search ...
 func Search(query string) (*SearchResponse, error) {
 	url := makeSearchRequest(query)
 	result := new(SearchResponse)
