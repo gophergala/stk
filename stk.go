@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 
 	sto "github.com/gophergala/stk/stackoverflow"
 	"gopkg.in/alecthomas/kingpin.v1"
@@ -24,13 +25,14 @@ import (
 //But that's hard, so we are going to use exec.Cmd on the first go around.
 
 var (
-	errFile = kingpin.Flag("errFile",
+	errFileFlag = kingpin.Flag("errFile",
 		"Output errors to a file in the pwd with the timestamp for a name.").Default("false").Short('e').Bool()
 	commandArgs = kingpin.Arg("command", "Command being run").
 			Required().
 			Strings()
-	cmd *exec.Cmd
-	err error
+	cmd     *exec.Cmd
+	err     error
+	errFile *os.File
 )
 
 //Any init code that we need will eventually be put in here
@@ -39,6 +41,13 @@ func init() {
 	cleanInput()
 	if cmd.Path == "" {
 		log.Fatalln("The provided command is not installed")
+	}
+	if *errFileFlag {
+		errFile, err = os.Create(time.Now().UTC().
+			Format("Jan 2, 2006 at 3:04pm (MST)"))
+		if err != nil {
+			log.Fatalln("File Creation err: ", err)
+		}
 	}
 	log.Printf("Starting Up. %#v", commandArgs)
 }
@@ -50,11 +59,11 @@ func init() {
 //  the API call,
 // 4. Get results, prepend file name to whatever the output was from the api
 func main() {
+	if *errFileFlag {
+		defer errFile.Close()
+	}
 	//This will choke if more than one cmd is passed
 	execCmd()
-
-	// LOGIC FOR CAPTURING STDERR
-
 	//	reason, url := findReason("drush failed", "", "")
 	//	printError("Error occured", reason, url)
 }
@@ -95,29 +104,54 @@ func execCmd() {
 	if e := cmd.Start(); e != nil {
 		log.Fatal("Process Start Failed", e)
 	}
+	errChan := make(chan string)
 	go passStdOut(r)
-	go processErrs(reader)
+	go processErrs(reader, errChan)
 
-	//Problem? If the command exits it passes back a
+	//Problem? If the command exits it passes back a Proc state to err which will prompt an exit before the go routine can even process.
+	//Solution is channels.
 	if err := cmd.Wait(); err != nil {
 		//Type is exit error
-		log.Fatal("Problem?", err)
+		//log.Fatal("Problem?", err)
+		select {
+		case <-errChan:
+			log.Fatal(err)
+		}
 	}
+
 }
 
 //processErrs is the function that launches the requests to the API
-func processErrs(reader *bufio.Reader) {
+func processErrs(reader *bufio.Reader, errChan chan<- string) {
+	var writer *bufio.Writer
+	if *errFileFlag {
+		writer = bufio.NewWriter(errFile)
+	}
 	for {
 		s, err := reader.ReadString('\n')
 		if err != nil {
 			if err != io.EOF {
 				log.Println("Read err", err)
+				errChan <- err.Error()
 			}
 			continue
 		} else {
 			log.Println("Captured: ", s)
 			reason, url := findReason(s, (*commandArgs)[0], "")
 			printError("Error Captured:", reason, url)
+			if *errFileFlag {
+				n, e := writer.WriteString(s + "\n")
+				if e != nil {
+					log.Printf("Bytes written: %d.Err:%v",
+						n, err)
+
+				}
+				//I want to defer this flush till exit but
+				//that would mean adding it to the main func
+				//which would require a new global var
+				writer.Flush()
+			}
+			errChan <- s
 		}
 	}
 }
