@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 	"time"
 
 	sto "github.com/gophergala/stk/stackoverflow"
@@ -33,6 +35,7 @@ var (
 	cmd     *exec.Cmd
 	err     error
 	errFile *os.File
+	nohtml  *regexp.Regexp
 )
 
 //Any init code that we need will eventually be put in here
@@ -50,6 +53,12 @@ func init() {
 		}
 	}
 	log.Printf("Starting Up. %#v", commandArgs)
+	nohtml, _ = regexp.Compile("<[^>]*>")
+
+}
+
+func stripHtml(htmlContent string) string {
+	return nohtml.ReplaceAllString(htmlContent, "")
 }
 
 //the main loop is probably going to look like:
@@ -64,8 +73,12 @@ func main() {
 	}
 	//This will choke if more than one cmd is passed
 	execCmd()
-	//	reason, url := findReason("drush failed", "", "")
-	//	printError("Error occured", reason, url)
+	//	stderr := "The drush command could not be found"
+
+	//	reason, url := findReason(stderr, "", "")
+	//	sanitized := stripHtml(reason)
+
+	//	printError(stderr, sanitized, url)
 }
 
 //CleanInput takes all the relevant arguments from os.Args
@@ -138,7 +151,7 @@ func processErrs(reader *bufio.Reader, errChan chan<- string) {
 		} else {
 			log.Println("Captured: ", s)
 			reason, url := findReason(s, (*commandArgs)[0], "")
-			printError("Error Captured:", reason, url)
+			printError("Error Captured:", stripHtml(reason), url)
 			if *errFileFlag {
 				n, e := writer.WriteString(s + "\n")
 				if e != nil {
@@ -201,16 +214,24 @@ func printError(errstr string, maybeReason string, detailURL string) {
 	fmt.Println()
 }
 
-func bold(text string) string {
-	if os.Getenv("TERM") == "xterm" {
-		return "\033[1m" + text + "\033[0m"
+func xterm(code string) func(s string) string {
+	env := os.Getenv("TERM")
+	isXterm := strings.Contains(env, "xterm")
+
+	return func(text string) (output string) {
+		if isXterm {
+			output = code + text + "\033[0m"
+		} else {
+			output = text
+		}
+		return
 	}
-	return text
+}
+
+func bold(text string) string {
+	return xterm("\033[1m")(text)
 }
 
 func underline(text string) string {
-	if os.Getenv("TERM") == "xterm" {
-		return "\033[4m" + text + "\033[0m"
-	}
-	return text
+	return xterm("\033[4m")(text)
 }
