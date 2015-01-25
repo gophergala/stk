@@ -107,7 +107,7 @@ func execCmd() {
 	if e != nil {
 		log.Fatal("Pipe conn err: ", e)
 	}
-	reader := bufio.NewReader(stderr)
+	reader := bufio.NewScanner(stderr)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -124,10 +124,15 @@ func execCmd() {
 	//Problem? If the command exits it passes back a Proc state to err which will prompt an exit before the go routine can even process.
 	//Solution is channels.
 	if err := cmd.Wait(); err != nil {
+
 		//Type is exit error
 		//log.Fatal("Problem?", err)
 		select {
 		case <-errChan:
+			/*			if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+						err = err.(exec.ExitError)
+						s := (syscall.WaitStatus)(err.ProcessState.Sys)
+					}*/
 			log.Fatal(err)
 		}
 	}
@@ -135,38 +140,37 @@ func execCmd() {
 }
 
 //processErrs is the function that launches the requests to the API
-func processErrs(reader *bufio.Reader, errChan chan<- string) {
+func processErrs(scanner *bufio.Scanner, errChan chan<- string) {
 	var writer *bufio.Writer
 	if *errFileFlag {
 		writer = bufio.NewWriter(errFile)
 	}
-	for {
-		s, err := reader.ReadString('\n')
-		if err != nil {
-			if err != io.EOF {
-				log.Println("Read err", err)
-				errChan <- err.Error()
+	//TODO (broluwo):FAULTY LOGIC SOMEWHERE BELOW
+	for scanner.Scan() {
+		s := scanner.Text()
+		log.Println("Captured: ", s)
+		reason, url := findReason(s, (*commandArgs)[0], "")
+		printError("Error Captured:", stripHtml(reason), url)
+		if *errFileFlag {
+			n, e := writer.WriteString(s + "\n")
+			if e != nil {
+				log.Printf("Bytes written: %d.Err:%v",
+					n, err)
 			}
-			continue
-		} else {
-			log.Println("Captured: ", s)
-			reason, url := findReason(s, (*commandArgs)[0], "")
-			printError("Error Captured:", stripHtml(reason), url)
-			if *errFileFlag {
-				n, e := writer.WriteString(s + "\n")
-				if e != nil {
-					log.Printf("Bytes written: %d.Err:%v",
-						n, err)
-
-				}
-				//I want to defer this flush till exit but
-				//that would mean adding it to the main func
-				//which would require a new global var
-				writer.Flush()
-			}
-			errChan <- s
+			//I want to defer this flush till exit but
+			//that would mean adding it to the main func
+			//which would require a new global var
+			writer.Flush()
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		if err != io.EOF {
+			log.Println("Read err", err)
+			errChan <- err.Error()
+		}
+	}
+	//TODO(broluwo): FAULTY LOGIC SOMEWHERE ABOVE
+	//Something about getting past the first line of input is fishy
 }
 
 func passStdOut(r *bufio.Reader) {
