@@ -187,7 +187,7 @@ func findReason(strerr, command, parameters string) (reason string, url string) 
 		return "", ""
 	}
 
-	answerID := res.Items[0].AcceptedAnswerId
+	answerID := res.Items[0].AcceptedAnswerID
 	answer, err := sto.GetAnswers(answerID)
 
 	if err != nil {
