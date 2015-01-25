@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 
 	sto "github.com/gophergala/stk/stackoverflow"
+	"gopkg.in/alecthomas/kingpin.v1"
 )
 
 //could use the command as a possible tag
@@ -21,9 +23,24 @@ import (
 //To truly get stderr, we would need to intercept any write call to the STDERR
 //But that's hard, so we are going to use exec.Cmd on the first go around.
 
+var (
+	errFile = kingpin.Flag("errFile",
+		"Output errors to a file in the pwd with the timestamp for a name.").Default("false").Short('e').Bool()
+	commandArgs = kingpin.Arg("command", "Command being run").
+			Required().
+			Strings()
+	cmd *exec.Cmd
+	err error
+)
+
 //Any init code that we need will eventually be put in here
 func init() {
-	log.Println("Starting Up.")
+	kingpin.Parse()
+	cleanInput()
+	if cmd.Path == "" {
+		log.Fatalln("The provided command is not installed")
+	}
+	log.Printf("Starting Up. %#v", commandArgs)
 }
 
 //the main loop is probably going to look like:
@@ -34,32 +51,25 @@ func init() {
 // 4. Get results, prepend file name to whatever the output was from the api
 func main() {
 	//This will choke if more than one cmd is passed
-	/*	cmd, err := cleanInput(os.Args[1:]...)
-		if err != nil {
-			log.Fatalf("The provided command is not installed: %T %v",
-				err,
-				err)
-		}
-		execCmd(cmd)
-	*/
+	execCmd()
+
 	// LOGIC FOR CAPTURING STDERR
 
-	reason, url := findReason("drush failed", "", "")
-	printError("Error occured", reason, url)
+	//	reason, url := findReason("drush failed", "", "")
+	//	printError("Error occured", reason, url)
 }
 
 //CleanInput takes all the relevant arguments from os.Args
 //and tries to break it down into an exec.Cmd struct
 //This will need a lot of tuning as it will be fragile
-func cleanInput(arg ...string) (cmd *exec.Cmd, err error) {
-	if len(arg) <= 0 {
+func cleanInput() {
+	if len(*commandArgs) <= 0 {
 		log.Fatalln("Must provide input.")
 	}
-	log.Printf("Args: %v\n", arg)
 	if len(os.Args) > 2 {
-		cmd = exec.Command(os.Args[1], os.Args[2:]...)
+		cmd = exec.Command((*commandArgs)[0], (*commandArgs)[1:]...)
 	} else {
-		cmd = exec.Command(os.Args[1], "")
+		cmd = exec.Command((*commandArgs)[0])
 	}
 	log.Printf("cmd.Args: %#v", cmd.Args)
 	return
@@ -70,20 +80,28 @@ func cleanInput(arg ...string) (cmd *exec.Cmd, err error) {
 //blocking on the exit of the cmd
 //Redirects the stderr(which expects an io.Writer) into a channel,
 //which the API is blocking on in order to launch a request.
-func execCmd(cmd *exec.Cmd) {
+func execCmd() {
 	stderr, e := cmd.StderrPipe()
 	if e != nil {
 		log.Fatal("Pipe conn err: ", e)
 	}
 	reader := bufio.NewReader(stderr)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal("Pipe conn err: ", err)
+	}
+	r := bufio.NewReader(stdout)
 	if e := cmd.Start(); e != nil {
 		log.Fatal("Process Start Failed", e)
 	}
+	go passStdOut(r)
 	go processErrs(reader)
 
+	//Problem? If the command exits it passes back a
 	if err := cmd.Wait(); err != nil {
 		//Type is exit error
-		log.Fatal(err)
+		log.Fatal("Problem?", err)
 	}
 }
 
@@ -92,10 +110,22 @@ func processErrs(reader *bufio.Reader) {
 	for {
 		s, err := reader.ReadString('\n')
 		if err != nil {
-			log.Fatal("Read err", err)
-			return
+			if err != io.EOF {
+				log.Println("Read err", err)
+			}
+			continue
+		} else {
+			log.Println("Captured: ", s)
+			reason, url := findReason(s, (*commandArgs)[0], "")
+			printError("Error Captured:", reason, url)
 		}
-		log.Println("Captured: ", s)
+	}
+}
+
+func passStdOut(r *bufio.Reader) {
+	_, err := r.WriteTo(os.Stdout)
+	if err != nil {
+		log.Println("Write err", err)
 	}
 }
 
