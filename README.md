@@ -5,6 +5,10 @@ STK
 
 ```
 $ stk mysql -u root -ptest
+```
+
+Will produce:
+```
 Warning: Using a password on the command line interface can be insecure.
 
 Similar from Stackoverflow:
@@ -30,4 +34,4 @@ A project made for Gopher Gala by [Igor Vasilcovsky](https://github.com/vasilcov
 
 ##Dependencies (outside the std lib)
 * [Kingpin](https://github.com/alecthomas/kingpin)
-* ...
+* [Builder] (https://github.com/lann/builder)
