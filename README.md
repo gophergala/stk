@@ -31,6 +31,14 @@ A project made for Gopher Gala by [Igor Vasilcovsky](https://github.com/vasilcov
 ##Example Usage
 ![Usage](https://raw.githubusercontent.com/gophergala/stk/master/content/stk.gif?token=AChZnLq3CjjS9NXpaElipGZqqr6n5C6Uks5UzWD7wA%3D%3D)
 
+##Installing
+```
+go get github.com/gophergala/stk
+go build github.com/gophergala/stk
+
+#test
+$GOPATH/bin/stk mysql
+```
 
 ##Dependencies (outside the std lib)
 * [Kingpin](https://github.com/alecthomas/kingpin) - A Go (golang) command line and flag parser
